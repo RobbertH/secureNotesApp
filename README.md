@@ -1,8 +1,7 @@
 # notes
 
-A new Flutter project.
+Written in the [Flutter](https://flutter.io/) framework.
 
-## Getting Started
+## About
+This app aims to be a very simple alternative to the existing notes applications that aren't as secure or privacy-focused. 
 
-For help getting started with Flutter, view our online
-[documentation](https://flutter.io/).
