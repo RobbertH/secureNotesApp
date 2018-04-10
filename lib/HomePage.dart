@@ -48,7 +48,7 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  Future<Null> _makeNewNote() async {
+  void _makeNewNote() async {
     // TODO: this whole thing is not right. If + button is pressed,
     // TODO should go to new note immediately and don't care about titles until later. Also app needs to take care of IDs.
     // TODO Use date or increasing counter for IDs.
@@ -59,35 +59,15 @@ class HomePageState extends State<HomePage> {
     //    Add the ID to sharedprefs and maybe to the page builder
     // Navigate to new note
     debugPrint("new note!");
-    return showDialog(context: context,
-        child: new AlertDialog(
-          title: new Text("which title?"),
-          actions: <Widget>[
-            new Container(
-              child: new TextField(
-                onSubmitted: (txt) => _noteIDs.add(txt),
-                maxLines: 1,
-                decoration: new InputDecoration(
-                  border: new OutlineInputBorder(borderRadius: new BorderRadius.all(new Radius.circular(2.0))),
-                  hintText: "Insert title here",
-                  isDense: true,
-                  contentPadding: new EdgeInsets.all(2.0),
-                ),
-              ),
-              width: 170.0, // TODO: align textfield left
-              alignment: new Alignment(0.0, 0.0),
-            ),
-                        new FlatButton(
-              onPressed: () => setState((){
-                
-                Navigator.of(context).pop();
-              }),
-              child: new Text("OK"),
-            )
-          ],
-        ));
-    _noteIDs.add("lol");
-    _saveNewNoteID();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    //int lastID = 0;
+    int lastID = prefs.getInt("lastID") ?? 0;
+    int newID = lastID + 1;
+    _noteIDs.add(newID.toString());
+    debugPrint(_noteIDs.toString());
+    prefs.setInt("lastID", newID);
+    prefs.setStringList("noteIDs", _noteIDs.toList());
+    Navigator.of(context).pushNamed("/noteEditor/${newID.toString()}");
   }
 
   void _saveNewNoteID() async {
