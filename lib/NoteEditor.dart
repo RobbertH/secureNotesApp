@@ -36,7 +36,8 @@ class NoteEditorState extends State<NoteEditor> {
 
   void _loadNoteFromMemory() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState( () => _note = prefs.getString(id) ?? "lol" );
+    setState( () => _note = prefs.getString(id) ?? "An error occurred. ID not found." );
+    _textController.text = _note;
   }
 
   @override
