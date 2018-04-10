@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
+// TODO: encrypt notes and their titles
+// decrypt all titles (seperate file), to build the listView
+// decrypt note (seperate file per note) only when clicked on the respective listTile
+// TODO: switch from sharedprefs to files (better for exporting & encrypting)
+
 class HomePage extends StatefulWidget {
   @override
   State<StatefulWidget> createState() {
