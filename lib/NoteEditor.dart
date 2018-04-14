@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NoteEditor extends StatefulWidget {
