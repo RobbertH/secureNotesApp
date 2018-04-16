@@ -8,9 +8,19 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // TODO: encrypt notes and their titles
 // decrypt all titles (seperate file), to build the listView
 // decrypt note (seperate file per note) only when clicked on the respective listTile
+
 // TODO: switch from sharedprefs to files (better for exporting & encrypting)
 // TODO: sharedpreferences is super wrong! use files!
+
 // TODO: implement export feature: without encryption (plain) / without salt / with everything (and release salt to user)
+
+// TODO: is it possible to 'ask' the loginpage to decrypt the notes?
+// TODO: otherwise, just pass the key that was generated from the password (via the Constructor) -> seems like a bad idea
+// TODO: I think we might be able to create a separate class that handles decryption and encryption. But would that
+// TODO: make it better? You still pass it the password or key in the constructor :(
+
+// TODO: I don't think any of this matters. The _userSuppliedPassword is a variable in LoginPage, so
+// TODO: if a hacker could intercept a constructor, he could as well intercept the _userSuppliedPassword. Just pass it.
 
 class HomePage extends StatefulWidget {
   @override
@@ -24,9 +34,6 @@ class HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>();
 
   final _storage = new FlutterSecureStorage(); // to securely store the salt
-  String _randomKey = "Unknown";
-  String _string = "Unknown";
-  String _encrypted = "Unknown";
 
   Set<String> _noteIDs = new Set();
 
@@ -37,40 +44,14 @@ class HomePageState extends State<HomePage> {
     _loadIDsFromMemory();
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
   _initPlatformState() async {
     final PlatformStringCryptor cryptor = new PlatformStringCryptor();
+    final String _salt = await _storage.read(key: "salt");
+    final String _password = await _storage.read(key: "password"); // TODO: is this a good idea?
+    // TODO: Think about passing the notes themselves, or asking LoginPage to do the decrypting
 
-    final String key = await cryptor.generateRandomKey();
-    debugPrint("randomKey: $key");
-
-    final String string = "here is the string, here is the string.";
-    final String encrypted = await cryptor.encrypt(string, key);
-    final String decrypted = await cryptor.decrypt(encrypted, key);
-
-    assert(decrypted == string);
-
-    final String userSuppliedKey =
-        "jIkj0VOLhFpOJSpI7SibjA==:RZ03+kGZ/9Di3PT0a3xUDibD6gmb2RIhTVF+mQfZqy0=";
-
-    try {
-      await cryptor.decrypt(encrypted, userSuppliedKey);
-    } on MacMismatchException {
-      debugPrint("wrongly decrypted");
-    }
-
-    final salt = "Ee/aHwc6EfEactQ00sm/0A=="; // await cryptor.generateSalt();
-    final password = "a_strong_password%./😋";
-    final generatedKey = await cryptor.generateKeyFromPassword(password, salt);
-    debugPrint("salt: $salt, key: $generatedKey");
-
-    assert(generatedKey == userSuppliedKey);
-
-    setState(() {
-      _randomKey = key;
-      _string = string;
-      _encrypted = encrypted;
-    });
+    final String _generatedKey = await cryptor.generateKeyFromPassword(_password, _salt);
+    debugPrint(_generatedKey);
   }
 
   void _loadIDsFromMemory() async {

@@ -3,7 +3,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_string_encryption/flutter_string_encryption.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// TODO: give feedback when decrypting (spinning loader in toast or something)
+// TODO: give feedback when decrypting (spinning loader or something)
+
+// TODO: an idea is to - at the first time, when choosing a password - encrypt a sentence with that password
+// TODO: and save that sentence to secure storage (if that's permanent storage at least)
+// TODO: if the user can decrypt it (no MAC exception), the password is correct. This way the password is not stored.
 
 class LoginPage extends StatefulWidget {
   @override
@@ -18,6 +22,9 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = new GlobalKey<FormState>();
 
   String _userSuppliedPassword;
+  String _errorMessage = "";
+
+  Color _keyIconColor = Colors.amber;
 
   final _secureStorage = new FlutterSecureStorage(); // to securely store the salt
 
@@ -54,11 +61,11 @@ class _LoginPageState extends State<LoginPage> {
                   labelText: 'Your password',
                   icon: new Transform(
                     transform: new Matrix4.rotationZ(3.14159265/2),
-                    child: new Icon(Icons.vpn_key, color: Colors.amber,),
+                    child: new Icon(Icons.vpn_key, color: _keyIconColor,),
                     alignment: FractionalOffset.bottomRight,
                     origin: new Offset(-10.0, -10.0),
                   ),
-                  suffixIcon: new GestureDetector(
+                  suffixIcon: new InkWell(
                     onTap: _onOK,
                     child: new Container(
                       decoration: new BoxDecoration(
@@ -69,13 +76,14 @@ class _LoginPageState extends State<LoginPage> {
                         fontWeight: FontWeight.bold,
                       ),
                       ),
+                      ),
                     ),
-                  ),
                 ),
                 validator: (value) => value.length == 0 ? 'Please input a password' : null, // TODO: passwordless should be possible. Lay end responsibility at user.
                 onSaved: (value) => _userSuppliedPassword = value,
                 obscureText: true,
               ),
+              new Text(_errorMessage),
               new Expanded(child: new Container()),
             ],
           ),
@@ -96,11 +104,13 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _performLogin() async {
+
+    setState((){
+      _keyIconColor = Colors.amber;
+      _errorMessage = "\n Decrypting. Please wait.";
+    } );
+
     debugPrint("OK!!!!!!!!!!");
-    // feedback: show snackbar
-    _scaffoldKey.currentState.showSnackBar(new SnackBar(
-      content: new Row(children: <Widget>[new Icon(Icons.play_circle_filled), new Text("Decrypting... Please wait.")],),
-    ));
 
     // start decrypting
     final PlatformStringCryptor cryptor = new PlatformStringCryptor();
@@ -112,19 +122,19 @@ class _LoginPageState extends State<LoginPage> {
     String _salt;
 
     try { // fetch salt from secure memory
-      _salt = await _secureStorage.read(key: "salt"); // TODO: differ between first time login -> generate salt
+      _salt = await _secureStorage.read(key: "salt");
+      // TODO: differ between first time login -> generate salt
       // TODO: and not first time -> just read
+      // TODO: at initstate, display a text saying the user can make their passwd by entering one
     }
     catch (e) { // don't have a salt yet -> make one
       _salt = await cryptor.generateSalt();
       await _secureStorage.write(key: "salt", value: _salt);
     }
 
-    // TODO continue coding here :D
+    final String _key = await cryptor.generateKeyFromPassword("p", _salt);
 
-    final String key = await cryptor.generateKeyFromPassword("p", _salt);
-
-    final String encrypted = await cryptor.encrypt(string, key);
+    final String encrypted = await cryptor.encrypt(string, _key);
 
     String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _salt);
     String _noteTitlesDecrypted;
@@ -132,23 +142,22 @@ class _LoginPageState extends State<LoginPage> {
       _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
     } on MacMismatchException {
       debugPrint("wrongly decrypted");
-      // TODO reset textfield & show snackbar (or red error form)
-      final snackbar = new SnackBar(
-        content: new Text(_noteTitlesDecrypted ?? "Wrong! haha"),
-      );
-      _scaffoldKey.currentState.showSnackBar(snackbar);
+      setState((){
+        _keyIconColor = Colors.red;
+        _errorMessage = "\n Wrong password. Please retry.";
+      });
+      // TODO think about best way to inform user: snackbar, red error form or status quo (text)
     }
+
+    // TODO reset textfield!!!!!!!!!!!!!!!!!! important!!!!!!!!!!!!!
 
     if (_noteTitlesDecrypted != null) {
       // doesn't matter if hacker sets this to non-null somehow, values aren't decrypted in that case :)
-      Navigator.of(context).pushNamed('/homePage');
+      Navigator.of(context).pushNamed('/homePage/$_key/$_noteTitlesDecrypted'); // TODO: slash probably not best option
+      // TODO: use question mark or somethin :)
+      setState(() { _errorMessage = "\n ";});
+      // TODO pass decrypted note titles to homepage
     }
-
-    _scaffoldKey.currentState.showSnackBar(
-      new SnackBar(
-          content: new Text(_noteTitlesDecrypted ?? "Wrong!")
-      )
-    );
 
 
   }
