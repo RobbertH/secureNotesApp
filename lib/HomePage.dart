@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_string_encryption/flutter_string_encryption.dart';
 import 'dart:async';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 
 // TODO: encrypt notes and their titles
 // decrypt all titles (seperate file), to build the listView
@@ -127,6 +128,32 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  Future<String> get _localPath async {
+    final directory = await getApplicationDocumentsDirectory();
+    return directory.path;
+  }
+
+  Future<File> get _titleFile async {
+    final path = await _localPath;
+    return new File('$path/note_titles.txt');
+  }
+
+  Future<File> writeTitles(String titles) async {
+  final file = await _titleFile;
+  return file.writeAsString('$titles'); // Write the file
+}
+
+  Future<int> readCounter() async {
+    try {
+      final file = await _titleFile;
+      String contents = await file.readAsString(); // Read the file
+      return int.parse(contents);
+    }
+    catch (e) {
+      return 0; // If we encounter an error, return 0
+    }
+  }
+  
 
 
 }
