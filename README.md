@@ -6,8 +6,8 @@ Written in the [Flutter](https://flutter.io/) framework.
 This app aims to be a very simple alternative to the existing notes applications that aren't as secure or privacy-focused. 
 
 ## Why this secure notes app?
-* State of the art [encryption](https://pub.dartlang.org/packages/flutter_string_encryption) (AES/CBC/PKCS5/Random IVs/HMAC-SHA256 Integrity Check for encrypting/decrypting notes
-* [salted SHA-256](https://pub.dartlang.org/packages/crypt) for storing the password in [secure storage](https://pub.dartlang.org/packages/flutter_secure_storage))
+* State of the art [encryption](https://pub.dartlang.org/packages/flutter_string_encryption) (AES/CBC/PKCS5/Random IVs/HMAC-SHA256 Integrity Check for encrypting/decrypting notes)
+* [salted SHA-256](https://pub.dartlang.org/packages/crypt) for storing the password in [secure storage](https://pub.dartlang.org/packages/flutter_secure_storage)
 * [Open source](https://github.com/robberth/secureNotesApp)
 * Cross-platform (available both on Android and iOS)
 
