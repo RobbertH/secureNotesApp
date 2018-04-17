@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_string_encryption/flutter_string_encryption.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:crypt/crypt.dart';
+import 'dart:math';
 
-// TODO: give feedback when decrypting (spinning loader or something)
-
-// TODO: an idea is to - at the first time, when choosing a password - encrypt a sentence with that password
-// TODO: and save that sentence to secure storage (if that's permanent storage at least)
-// TODO: if the user can decrypt it (no MAC exception), the password is correct. This way the password is not stored.
+// TODO: animated feedback when decrypting (spinning loader or something)
 
 class LoginPage extends StatefulWidget {
   @override
@@ -28,13 +26,33 @@ class _LoginPageState extends State<LoginPage> {
 
   final _secureStorage = new FlutterSecureStorage(); // to securely store the salt
 
+  final TextEditingController textEditingController = new TextEditingController();
+
   Set<String> _noteIDs = new Set();
 
   @override
   initState() {
     debugPrint("LoginPage");
     super.initState();
-    _loadIDsFromMemory();
+    _checkIfFirstTime();
+    _loadIDsFromMemory(); // TODO remove?
+  }
+
+  void _checkIfFirstTime() async {
+    String tester;
+    try { // see if password exists in secure memory
+      tester = await _secureStorage.read(key: "passwordHash");
+    }
+    catch (e) { // don't have a password yet -> new user
+      setState(() {
+        _errorMessage = "\n Welcome. Please set a new password.";
+      });
+    }
+    if (tester == null){ // don't have a password yet -> new user
+      setState(() {
+        _errorMessage = "\n Welcome. Please set a new password.";
+      });
+    }
   }
 
   void _loadIDsFromMemory() async {
@@ -57,6 +75,7 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               new Expanded(child: new Container()),
               new TextFormField(
+                controller: textEditingController,
                 decoration: new InputDecoration(
                   labelText: 'Your password',
                   icon: new Transform(
@@ -99,68 +118,118 @@ class _LoginPageState extends State<LoginPage> {
 
     if (form.validate()) {
       form.save();
+      textEditingController.clear();
       _performLogin();
     }
   }
 
   void _performLogin() async {
-
+    // USER FEEDBACK: WE'RE DOING STUFF FOR YOU
     setState((){
       _keyIconColor = Colors.amber;
-      _errorMessage = "\n Decrypting. Please wait.";
+      _errorMessage = "\n Verifying password. Please wait.";
     } );
 
     debugPrint("OK!!!!!!!!!!");
 
-    // start decrypting
-    final PlatformStringCryptor cryptor = new PlatformStringCryptor();
+    // === AUTHENTICATION FIRST ===
+    String _passwordHash;
 
-    final String string = "Note titles fetched from memory:title 1:title 2:title 3"; // TODO validate titles (no ":")
-
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    String _salt;
-
-    try { // fetch salt from secure memory
-      _salt = await _secureStorage.read(key: "salt");
-      // TODO: differ between first time login -> generate salt
-      // TODO: and not first time -> just read
-      // TODO: at initstate, display a text saying the user can make their passwd by entering one
+    try { // fetch password hash from secure memory
+      _passwordHash = await _secureStorage.read(key: "passwordHash");
     }
-    catch (e) { // don't have a salt yet -> make one
-      _salt = await cryptor.generateSalt();
-      await _secureStorage.write(key: "salt", value: _salt);
+    catch (e) { // don't have a password yet -> make one
+      setState(() {
+        _errorMessage = "\n Securely storing new password. Please wait.";
+      });
+      Crypt newHashMachine = new Crypt.sha256(_userSuppliedPassword); // randomly salted (handled by Crypt)
+      _passwordHash = newHashMachine.toString();
+      await _secureStorage.write(key: "passwordHash", value: _passwordHash); // store password hash
+    }
+    if (_passwordHash == null) { // duplicate code sucks :(
+      setState(() {
+        _errorMessage = "\n Securely storing new password. Please wait.";
+      });
+      Crypt newHashMachine = new Crypt.sha256(_userSuppliedPassword); // randomly salted (handled by Crypt)
+      _passwordHash = newHashMachine.toString();
+      await _secureStorage.write(key: "passwordHash", value: _passwordHash); // store password hash
     }
 
-    final String _key = await cryptor.generateKeyFromPassword("p", _salt);
-
-    final String encrypted = await cryptor.encrypt(string, _key);
-
-    String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _salt);
-    String _noteTitlesDecrypted;
-    try {
-      _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
-    } on MacMismatchException {
-      debugPrint("wrongly decrypted");
+    Crypt hashMachine = new Crypt(_passwordHash);
+    if (!hashMachine.match(_userSuppliedPassword)) { // Wrong password
+      debugPrint(":( oo");
       setState((){
         _keyIconColor = Colors.red;
         _errorMessage = "\n Wrong password. Please retry.";
       });
-      // TODO think about best way to inform user: snackbar, red error form or status quo (text)
+    }
+    else { // Correct password
+      setState((){
+        _keyIconColor = Colors.greenAccent;
+        _errorMessage = "\n Correct password. Decrypting. Please wait.";
+      });
+      // === LOGIN SUCCESFUL -> DECRYPT NOTE TITLES ===
+      final PlatformStringCryptor cryptor = new PlatformStringCryptor();
+      debugPrint("crrct");
+
+      String _saltForNotes;
+      try { // fetch salt from secure memory
+        debugPrint("here");
+        _saltForNotes = await _secureStorage.read(key: "saltForNotes");
+      }
+      catch (e) { // don't have a salt yet -> make one
+        debugPrint("never");
+        _saltForNotes = await cryptor.generateSalt();
+        await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
+      }
+      if (_saltForNotes == null) {
+        debugPrint("here!");
+        _saltForNotes = _randomString(16); // 16 characters (should be bytes) salt
+        await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
+      }
+
+    final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes); // TODO p
+
+      final String string = "Note titles fetched from memory:title 1:title 2:title 3"; // TODO validate titles (no ":")
+      final String encrypted = await cryptor.encrypt(string, _key);
+      String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
+      String _noteTitlesDecrypted;
+      try {
+        _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
+      } on MacMismatchException {
+        setState((){
+          _keyIconColor = Colors.red;
+          _errorMessage = "\n Wrong password. Please retry.";
+        });
+        // TODO think about best way to inform user: snackbar, red error form or status quo (text)
+      }
+
+      if (_noteTitlesDecrypted != null) {
+        // doesn't matter if hacker sets this to non-null somehow, values aren't decrypted in that case :)
+        Navigator.of(context).pushNamed('/homePage/$_key/$_noteTitlesDecrypted'); // TODO: slash probably not best option
+        // TODO: use question mark or somethin :)
+        setState(() { _errorMessage = "\n ";});
+        // TODO pass decrypted note titles to homepage
+      }
+
     }
 
-    // TODO reset textfield!!!!!!!!!!!!!!!!!! important!!!!!!!!!!!!!
-
-    if (_noteTitlesDecrypted != null) {
-      // doesn't matter if hacker sets this to non-null somehow, values aren't decrypted in that case :)
-      Navigator.of(context).pushNamed('/homePage/$_key/$_noteTitlesDecrypted'); // TODO: slash probably not best option
-      // TODO: use question mark or somethin :)
-      setState(() { _errorMessage = "\n ";});
-      // TODO pass decrypted note titles to homepage
-    }
-
+    debugPrint("hurroo");
 
   }
+
+  String _randomString(int length) {
+   var rand = new Random.secure();
+   var codeUnits = new List.generate(
+      length,
+      (index){
+         return rand.nextInt(33)+89;
+      }
+   );
+
+   return new String.fromCharCodes(codeUnits);
+}
+
 
 
 }
