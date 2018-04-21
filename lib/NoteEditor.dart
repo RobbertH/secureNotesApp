@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+
+// TODO: make a separate file for a class Note, with ID, encryptedTitle, encryptedContent
+// TODO: and methods to decrypt them using a supplied password
 
 class NoteEditor extends StatefulWidget {
   final String id;
@@ -24,7 +29,6 @@ class NoteEditorState extends State<NoteEditor> {
   static String _note;
   bool _editorMode = false;
 
-
   TextEditingController _textController = new TextEditingController(text: _note);
 
   @override
@@ -34,8 +38,8 @@ class NoteEditorState extends State<NoteEditor> {
   }
 
   void _loadNoteFromMemory() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState( () => _note = prefs.getString(id) ?? "An error occurred. ID not found." );
+    String dummy = await readNote(id); // dummy needed to await
+    setState( () => _note = dummy);
     _textController.text = _note;
   }
 
@@ -91,8 +95,42 @@ class NoteEditorState extends State<NoteEditor> {
   }
 
   void _writeNoteToMemory(String value) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState( () => prefs.setString(id, value));
+    bool succeeded = await writeNote(id, value);
+    if (succeeded) {
+      debugPrint("written!");
+    }
   }
+
+  // TODO write titles? set?
+
+  Future<bool> writeNote(String noteID, String noteContent) async {
+    final path = (await getApplicationDocumentsDirectory()).path;
+    final file = new File('$path/${noteID}.txt');
+    try {
+      file.writeAsString('$noteContent'); // Write the file
+      return true;
+    }
+    catch (e) {
+      debugPrint("damn :(");
+      return false;
+    }
+  }
+
+  Future<String> readNote(String noteID) async {
+    try {
+      final path = (await getApplicationDocumentsDirectory()).path;
+      final file = new File('$path/${noteID}.txt');
+      String contents = await file.readAsString(); // Read the file
+      debugPrint("he");
+      debugPrint(contents);
+      return contents;
+    }
+    catch (e) { // No file yet
+      //writeNote(noteTitle, "");
+      debugPrint("er");
+      return ""; // If we encounter an error, return empty str
+    }
+  }
+
 
 }

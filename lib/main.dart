@@ -5,7 +5,7 @@ import 'LoginPage.dart';
 import 'NoteEditor.dart';
 
 void main() => runApp(new MaterialApp(
-  home: new LoginPage(),
+  home: new HomePage(),
   onGenerateRoute: (RouteSettings settings) {
     if (settings.name == "/"){
       return new CustomRoute(

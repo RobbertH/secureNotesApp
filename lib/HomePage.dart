@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:flutter_string_encryption/flutter_string_encryption.dart';
 import 'dart:async';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // TODO get rid of this
 
 // TODO: encrypt notes and their titles
 // decrypt all titles (seperate file), to build the listView
@@ -31,7 +31,7 @@ class HomePage extends StatefulWidget {
 }
 
 class HomePageState extends State<HomePage> {
-  // DECLARATIONS
+
   final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>();
 
   final _storage = new FlutterSecureStorage(); // to securely store the salt
@@ -55,9 +55,11 @@ class HomePageState extends State<HomePage> {
     debugPrint(_generatedKey);
   }
 
-  void _loadIDsFromMemory() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState( () => _noteIDs = new Set.from(prefs.getStringList("noteIDs")) ?? new Set());
+  void _loadIDsFromMemory() async { // TODO fix this!!!!! test this!!!!!
+    String _noteIDsString = await readTitles();
+    String separator = "\$";
+    List<String> _noteIDsList = _noteIDsString.split(separator);
+    setState( () => _noteIDs = new Set.from(_noteIDsList) ?? new Set());
   }
 
   @override
@@ -116,7 +118,7 @@ class HomePageState extends State<HomePage> {
           new ListTile(
             leading: new Icon(Icons.library_books),
             title: new Text("aj"),
-            onTap: () => Navigator.of(context).pushNamed("/noteEditor/aj"),
+            onTap: readTitles,
           ),
           new ListTile(
             leading: new Icon(Icons.exit_to_app),
@@ -128,31 +130,28 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  Future<String> get _localPath async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> get _titleFile async {
-    final path = await _localPath;
-    return new File('$path/note_titles.txt');
-  }
-
-  Future<File> writeTitles(String titles) async {
-  final file = await _titleFile;
-  return file.writeAsString('$titles'); // Write the file
+  void writeTitles(String titles) async {
+    final path = (await getApplicationDocumentsDirectory()).path;
+    final file = new File('$path/note_titles.txt');
+    file.writeAsString('$titles'); // Write the file
 }
 
-  Future<int> readCounter() async {
+  Future<String> readTitles() async {
     try {
-      final file = await _titleFile;
+      final path = (await getApplicationDocumentsDirectory()).path;
+      final file = new File('$path/note_titles.txt');
       String contents = await file.readAsString(); // Read the file
-      return int.parse(contents);
+      debugPrint("he");
+      debugPrint(contents);
+      return contents;
     }
-    catch (e) {
-      return 0; // If we encounter an error, return 0
+    catch (e) { // No file yet
+      debugPrint("er");
+      return ""; // If we encounter an error, return empty str
     }
   }
+
+  
 
 
 
