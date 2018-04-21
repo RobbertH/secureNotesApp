@@ -3,7 +3,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_string_encryption/flutter_string_encryption.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypt/crypt.dart';
-import 'dart:math';
 
 // TODO: animated feedback when decrypting (spinning loader or something)
 
@@ -28,14 +27,14 @@ class _LoginPageState extends State<LoginPage> {
 
   final TextEditingController textEditingController = new TextEditingController();
 
-  Set<String> _noteIDs = new Set();
+//  Set<String> _noteIDs = new Set();
 
   @override
   initState() {
     debugPrint("LoginPage");
     super.initState();
     _checkIfFirstTime();
-    _loadIDsFromMemory(); // TODO remove?
+//    _loadIDsFromMemory(); // TODO remove?
   }
 
   void _checkIfFirstTime() async {
@@ -55,10 +54,11 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _loadIDsFromMemory() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState( () => _noteIDs = new Set.from(prefs.getStringList("noteIDs")) ?? new Set());
-  }
+//  void _loadIDsFromMemory() async {
+//    SharedPreferences prefs = await SharedPreferences.getInstance();
+//    setState( () => _noteIDs = new Set.from(prefs.getStringList("noteIDs")) ?? new Set());
+//    debugPrint(_noteIDs.toString());
+//  }
 
   @override
   Widget build(BuildContext context) {
@@ -125,74 +125,96 @@ class _LoginPageState extends State<LoginPage> {
 
   void _performLogin() async {
     // USER FEEDBACK: WE'RE DOING STUFF FOR YOU
-    setState((){
+    debugPrint("lala");
+
+    setState(() {
       _keyIconColor = Colors.amber;
       _errorMessage = "\n Verifying password. Please wait.";
-    } );
+    });
 
-    debugPrint("OK!!!!!!!!!!");
-
-    // === AUTHENTICATION FIRST ===
-    String _passwordHash;
-
-    try { // fetch password hash from secure memory
-      _passwordHash = await _secureStorage.read(key: "passwordHash");
-    }
-    catch (e) { // don't have a password yet -> make one
-      setState(() {
-        _errorMessage = "\n Securely storing new password. Please wait.";
-      });
-      Crypt newHashMachine = new Crypt.sha256(_userSuppliedPassword); // randomly salted (handled by Crypt)
-      _passwordHash = newHashMachine.toString();
-      await _secureStorage.write(key: "passwordHash", value: _passwordHash); // store password hash
-    }
-    if (_passwordHash == null) { // duplicate code sucks :(
-      setState(() {
-        _errorMessage = "\n Securely storing new password. Please wait.";
-      });
-      Crypt newHashMachine = new Crypt.sha256(_userSuppliedPassword); // randomly salted (handled by Crypt)
-      _passwordHash = newHashMachine.toString();
-      await _secureStorage.write(key: "passwordHash", value: _passwordHash); // store password hash
+    authenticate();
     }
 
-    Crypt hashMachine = new Crypt(_passwordHash);
-    if (!hashMachine.match(_userSuppliedPassword)) { // Wrong password
-      debugPrint(":( oo");
-      setState((){
-        _keyIconColor = Colors.red;
-        _errorMessage = "\n Wrong password. Please retry.";
-      });
+    void authenticate() async {
+      // === AUTHENTICATION FIRST ===
+      // If the user can authenticate, the same password will be used
+      // To decrypt the note titles, and eventually the notes themselves
+      // The password will be pushed to the note editor.
+
+      String _passwordHash;
+
+      debugPrint("entertainers");
+
+      void onHashFetchFail() async {
+        // first declare inner function
+        setState(() {
+          _errorMessage = "\n Securely storing new password. Please wait.";
+        });
+        Crypt newHashMachine = new Crypt.sha256(
+            _userSuppliedPassword); // randomly salted (handled by Crypt)
+        _passwordHash = newHashMachine.toString();
+        await _secureStorage.write(
+            key: "passwordHash", value: _passwordHash); // store password hash
+      }
+      try { // fetch password hash from secure memory
+        _passwordHash = await _secureStorage.read(key: "passwordHash");
+      }
+      catch (e) { // don't have a password yet -> make one
+        onHashFetchFail();
+      }
+      if (_passwordHash == null) {
+        onHashFetchFail();
+      }
+
+      Crypt hashMachine = new Crypt(_passwordHash);
+      if (!hashMachine.match(_userSuppliedPassword)) { // Wrong password
+        setState(() {
+          _keyIconColor = Colors.red;
+          _errorMessage = "\n Wrong password. Please retry.";
+        });
+      }
+      else { // Correct password
+        setState(() {
+          _keyIconColor = Colors.greenAccent;
+          _errorMessage = "\n Correct password. Decrypting. Please wait.";
+        });
+        // === LOGIN SUCCESSFUL -> DECRYPT NOTE TITLES ===
+        decryptNoteTitles();
+      }
+
+      debugPrint("hurroo");
     }
-    else { // Correct password
-      setState((){
-        _keyIconColor = Colors.greenAccent;
-        _errorMessage = "\n Correct password. Decrypting. Please wait.";
-      });
-      // === LOGIN SUCCESFUL -> DECRYPT NOTE TITLES ===
+
+    void decryptNoteTitles() async {
       final PlatformStringCryptor cryptor = new PlatformStringCryptor();
       debugPrint("crrct");
 
+      // _saltForNotes fetching or generating
       String _saltForNotes;
+      void onSaltFetchFail() async {
+        _saltForNotes = await cryptor.generateSalt();
+        await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
+      }
       try { // fetch salt from secure memory
         debugPrint("here");
         _saltForNotes = await _secureStorage.read(key: "saltForNotes");
       }
       catch (e) { // don't have a salt yet -> make one
         debugPrint("never");
-        _saltForNotes = await cryptor.generateSalt();
-        await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
+        onSaltFetchFail();
       }
       if (_saltForNotes == null) {
         debugPrint("here!");
-        _saltForNotes = _randomString(16); // 16 characters (should be bytes) salt
-        await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
+        onSaltFetchFail();
       }
+      debugPrint("nice");
 
-    final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes); // TODO p
-
-      final String string = "Note titles fetched from memory:title 1:title 2:title 3"; // TODO validate titles (no ":")
+      final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes);
+      debugPrint("nice!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      final String string = "Note titles fetched from memory\$title 1\$title 2\$title 3"; // TODO validate titles (no "$")
       final String encrypted = await cryptor.encrypt(string, _key);
-      String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
+      //String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
+      final String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
       String _noteTitlesDecrypted;
       try {
         _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
@@ -207,28 +229,12 @@ class _LoginPageState extends State<LoginPage> {
       if (_noteTitlesDecrypted != null) {
         // doesn't matter if hacker sets this to non-null somehow, values aren't decrypted in that case :)
         Navigator.of(context).pushNamed('/homePage/$_key/$_noteTitlesDecrypted'); // TODO: slash probably not best option
-        // TODO: use question mark or somethin :)
+        // TODO: use question mark or somethin :) convert to base64?
         setState(() { _errorMessage = "\n ";});
         // TODO pass decrypted note titles to homepage
       }
 
     }
-
-    debugPrint("hurroo");
-
-  }
-
-  String _randomString(int length) {
-   var rand = new Random.secure();
-   var codeUnits = new List.generate(
-      length,
-      (index){
-         return rand.nextInt(33)+89;
-      }
-   );
-
-   return new String.fromCharCodes(codeUnits);
-}
 
 
 
