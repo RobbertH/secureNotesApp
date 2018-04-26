@@ -12,4 +12,5 @@ This app aims to be a very simple alternative to the existing notes applications
 * Cross-platform (available both on Android and iOS)
 
 ## Status
-So far you can only save notes to shared preferences, no encryption yet. 
+So far you can only save notes to files, no encryption yet. 
+Also waiting for flutter to update so non-string variables can be passed through the Navigator. 

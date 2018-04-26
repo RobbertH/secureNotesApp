@@ -24,28 +24,41 @@ import 'package:shared_preferences/shared_preferences.dart'; // TODO get rid of 
 // TODO: if a hacker could intercept a constructor, he could as well intercept the _userSuppliedPassword. Just pass it.
 
 class HomePage extends StatefulWidget {
+
+  String _userSuppliedKey;
+  List<String> _noteTitles;
+
+  HomePage(_userSuppliedKey, _NoteTitles); // constructor
+
   @override
   State<StatefulWidget> createState() {
+    //debugPrint(_userSuppliedKey); // TODO start coding here. WHY THE FUCK DOES PRINTING A VARIABLE RESULT IN AN ERROR?
     return new HomePageState();
   }
 }
 
 class HomePageState extends State<HomePage> {
 
-  final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>();
-
+  String _userSuppliedKey = "nog niet gezet";
+  final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>(); // to show toasts
   final _storage = new FlutterSecureStorage(); // to securely store the salt
-
   Set<String> _noteIDs = new Set();
+
+  //HomePageState(this._userSuppliedKey); // constructor
 
   @override
   initState() {
     super.initState();
     _initPlatformState();
     _loadIDsFromMemory();
+    debugPrint("this is the key we received:");
+    debugPrint(_userSuppliedKey);
+    debugPrint("bfore tryme");
+    tryme();
+    debugPrint("after tryme");
   }
 
-  _initPlatformState() async {
+  _initPlatformState() async { // TODO is this not working or something?
     final PlatformStringCryptor cryptor = new PlatformStringCryptor();
     final String _salt = await _storage.read(key: "salt");
     final String _password = await _storage.read(key: "password"); // TODO: is this a good idea?
@@ -55,9 +68,19 @@ class HomePageState extends State<HomePage> {
     debugPrint(_generatedKey);
   }
 
+  tryme() async {
+    debugPrint("terrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr");
+    writeTitles("title 1\$ title 2\$ title 3");
+    debugPrint("wrote titels");
+    var lol = await readTitles();
+    debugPrint(lol);
+  }
+
   void _loadIDsFromMemory() async { // TODO fix this!!!!! test this!!!!!
     String _noteIDsString = await readTitles();
     String separator = "\$";
+    debugPrint("about to split diz");
+    debugPrint(_noteIDsString);
     List<String> _noteIDsList = _noteIDsString.split(separator);
     setState( () => _noteIDs = new Set.from(_noteIDsList) ?? new Set());
   }
@@ -150,9 +173,6 @@ class HomePageState extends State<HomePage> {
       return ""; // If we encounter an error, return empty str
     }
   }
-
-  
-
 
 
 }

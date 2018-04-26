@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_string_encryption/flutter_string_encryption.dart';
 import 'package:crypt/crypt.dart';
+import 'dart:convert';
 
+// TODO: include pictures in the README
 // TODO: animated feedback when decrypting (spinning loader or something)
 
 class LoginPage extends StatefulWidget {
@@ -132,109 +134,114 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     authenticate();
+  }
+
+  void authenticate() async {
+    // === AUTHENTICATION FIRST ===
+    // If the user can authenticate, the same password will be used
+    // To decrypt the note titles, and eventually the notes themselves
+    // The password will be pushed to the note editor.
+
+    String _passwordHash;
+
+    debugPrint("entertainers");
+
+    void onHashFetchFail() async {
+      // first declare inner function
+      setState(() {
+        _errorMessage = "\n Securely storing new password. Please wait.";
+      });
+      Crypt newHashMachine = new Crypt.sha256(
+          _userSuppliedPassword); // randomly salted (handled by Crypt)
+      _passwordHash = newHashMachine.toString();
+      await _secureStorage.write(
+          key: "passwordHash", value: _passwordHash); // store password hash
+    }
+    try { // fetch password hash from secure memory
+      _passwordHash = await _secureStorage.read(key: "passwordHash");
+    }
+    catch (e) { // don't have a password yet -> make one
+      onHashFetchFail();
+    }
+    if (_passwordHash == null) {
+      onHashFetchFail();
     }
 
-    void authenticate() async {
-      // === AUTHENTICATION FIRST ===
-      // If the user can authenticate, the same password will be used
-      // To decrypt the note titles, and eventually the notes themselves
-      // The password will be pushed to the note editor.
-
-      String _passwordHash;
-
-      debugPrint("entertainers");
-
-      void onHashFetchFail() async {
-        // first declare inner function
-        setState(() {
-          _errorMessage = "\n Securely storing new password. Please wait.";
-        });
-        Crypt newHashMachine = new Crypt.sha256(
-            _userSuppliedPassword); // randomly salted (handled by Crypt)
-        _passwordHash = newHashMachine.toString();
-        await _secureStorage.write(
-            key: "passwordHash", value: _passwordHash); // store password hash
-      }
-      try { // fetch password hash from secure memory
-        _passwordHash = await _secureStorage.read(key: "passwordHash");
-      }
-      catch (e) { // don't have a password yet -> make one
-        onHashFetchFail();
-      }
-      if (_passwordHash == null) {
-        onHashFetchFail();
-      }
-
-      Crypt hashMachine = new Crypt(_passwordHash);
-      if (!hashMachine.match(_userSuppliedPassword)) { // Wrong password
-        setState(() {
-          _keyIconColor = Colors.red;
-          _errorMessage = "\n Wrong password. Please retry.";
-        });
-      }
-      else { // Correct password
-        setState(() {
-          _keyIconColor = Colors.greenAccent;
-          _errorMessage = "\n Correct password. Decrypting. Please wait.";
-        });
-        // === LOGIN SUCCESSFUL -> DECRYPT NOTE TITLES ===
-        decryptNoteTitles();
-      }
-
-      debugPrint("hurroo");
+    Crypt hashMachine = new Crypt(_passwordHash);
+    if (!hashMachine.match(_userSuppliedPassword)) { // Wrong password
+      setState(() {
+        _keyIconColor = Colors.red;
+        _errorMessage = "\n Wrong password. Please retry.";
+      });
+    }
+    else { // Correct password
+      setState(() {
+        _keyIconColor = Colors.greenAccent;
+        _errorMessage = "\n Correct password. Decrypting. Please wait.";
+      });
+      // === LOGIN SUCCESSFUL -> DECRYPT NOTE TITLES ===
+      decryptNoteTitles();
     }
 
-    void decryptNoteTitles() async {
-      final PlatformStringCryptor cryptor = new PlatformStringCryptor();
-      debugPrint("crrct");
+    debugPrint("hurroo");
+  }
 
-      // _saltForNotes fetching or generating
-      String _saltForNotes;
-      void onSaltFetchFail() async {
-        _saltForNotes = await cryptor.generateSalt();
-        await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
-      }
-      try { // fetch salt from secure memory
-        debugPrint("here");
-        _saltForNotes = await _secureStorage.read(key: "saltForNotes");
-      }
-      catch (e) { // don't have a salt yet -> make one
-        debugPrint("never");
-        onSaltFetchFail();
-      }
-      if (_saltForNotes == null) {
-        debugPrint("here!");
-        onSaltFetchFail();
-      }
-      debugPrint("nice");
+  void decryptNoteTitles() async {
+    final PlatformStringCryptor cryptor = new PlatformStringCryptor();
+    debugPrint("crrct");
 
-      final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes);
-      debugPrint("nice!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-      final String string = "Note titles fetched from memory\$title 1\$title 2\$title 3"; // TODO validate titles (no "$")
-      final String encrypted = await cryptor.encrypt(string, _key);
-      //String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
-      final String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
-      String _noteTitlesDecrypted;
-      try {
-        _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
-      } on MacMismatchException {
-        setState((){
-          _keyIconColor = Colors.red;
-          _errorMessage = "\n Wrong password. Please retry.";
-        });
-        // TODO think about best way to inform user: snackbar, red error form or status quo (text)
-      }
+    // _saltForNotes fetching or generating
+    String _saltForNotes;
+    void onSaltFetchFail() async {
+      _saltForNotes = await cryptor.generateSalt();
+      await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
+    }
+    try { // fetch salt from secure memory
+      debugPrint("here");
+      _saltForNotes = await _secureStorage.read(key: "saltForNotes");
+    }
+    catch (e) { // don't have a salt yet -> make one
+      debugPrint("never");
+      onSaltFetchFail();
+    }
+    if (_saltForNotes == null) {
+      debugPrint("here!");
+      onSaltFetchFail();
+    }
+    debugPrint("nice");
 
-      if (_noteTitlesDecrypted != null) {
-        // doesn't matter if hacker sets this to non-null somehow, values aren't decrypted in that case :)
-        Navigator.of(context).pushNamed('/homePage/$_key/$_noteTitlesDecrypted'); // TODO: slash probably not best option
-        // TODO: use question mark or somethin :) convert to base64?
-        setState(() { _errorMessage = "\n ";});
-        // TODO pass decrypted note titles to homepage
-      }
-
+    final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes);
+    debugPrint(_key);
+    debugPrint("nice!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    final String string = "[title 1, title 2, title 3]"; // TODO validate titles (no ",")
+    final String encrypted = await cryptor.encrypt(string, _key);
+    //String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
+    final String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
+    String _noteTitlesDecrypted;
+    try {
+      _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
+    } on MacMismatchException {
+      setState((){
+        _keyIconColor = Colors.red;
+        _errorMessage = "\n Wrong password. Please retry.";
+      });
+      // TODO think about best way to inform user: snackbar, red error form or status quo (text)
     }
 
+    if (_noteTitlesDecrypted != null) {
+      // doesn't matter if hacker sets this to non-null somehow, values aren't decrypted in that case :)
+      debugPrint("woop woop");
+      debugPrint(_key);
+      debugPrint(_noteTitlesDecrypted);
+      Navigator.of(context).pushNamed('/homePage/${utf8.encode(_key).toString()}/$_noteTitlesDecrypted');
+      // Need slash for routing. That's why we convert to utf8.
+      // Can only pass strings, so .toString() yields "[int, int, int,...]"
+      // will be parsed when routing
+      // TODO: decrypted noteTitles follow the same notation "[title, title, title,...]"
+      // TODO: so titles can never contain slashes or commas, otherwise routing breaks
+      setState(() { _errorMessage = "\n ";});
+    }
 
+  }
 
 }
