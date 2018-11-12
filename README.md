@@ -12,9 +12,10 @@ This app aims to be a very simple alternative to the existing notes applications
 
 ## Status
 So far you can only save notes to files, no encryption yet.
-
-At this moment the project is on hold, as I am waiting for a flutter update so non-string variables can be passed through the Navigator. 
-See this [GitHub issue](https://github.com/flutter/flutter/issues/6225).
+Update November 13, 2018: encryption inbound! Buckle up!
 
 ## Download
-So far there is no executable available, as this project is still in early development. You can obtain an executable by cloning this repo and building from source.
+As this project is still in early development, no executable is provided. You can obtain an executable by cloning this repo and building from source.
+
+## Disclaimer
+The software is provided as-is; in no event shall the author(s) be liable for any claim, damages or other liability.  
