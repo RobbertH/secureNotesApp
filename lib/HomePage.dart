@@ -5,10 +5,11 @@ import 'dart:async';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // TODO get rid of this
+import 'dart:math';
 
 // TODO: encrypt notes and their titles
 // decrypt all titles (seperate file), to build the listView
-// decrypt note (seperate file per note) only when clicked on the respective listTile
+// decrypt note (seperate file per note) only when clicked on the respective listTile => handled in NoteEditor
 
 // TODO: switch from sharedprefs to files (better for exporting & encrypting)
 // TODO: sharedpreferences is super wrong! use files!
@@ -26,63 +27,109 @@ import 'package:shared_preferences/shared_preferences.dart'; // TODO get rid of 
 class HomePage extends StatefulWidget {
 
   String _userSuppliedKey;
-  List<String> _noteTitles;
 
-  HomePage(_userSuppliedKey, _NoteTitles); // constructor
+  HomePage(this._userSuppliedKey); // constructor
 
   @override
   State<StatefulWidget> createState() {
-    //debugPrint(_userSuppliedKey); // TODO start coding here. WHY THE FUCK DOES PRINTING A VARIABLE RESULT IN AN ERROR?
-    return new HomePageState();
+    return new HomePageState(_userSuppliedKey);
   }
 }
 
 class HomePageState extends State<HomePage> {
 
-  String _userSuppliedKey = "nog niet gezet";
-  final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>(); // to show toasts
-  final _storage = new FlutterSecureStorage(); // to securely store the salt
-  Set<String> _noteIDs = new Set();
+  Map<int, List<String>> _noteTitlesAndIDs = new Map<int, List<String>>(); // e.g. {5: ["note title 1", "content short"]}
+  String _noteTitlesAndIDsDecrypted = ""; // as a string
+  String _noteTitlesAndIDsEncrypted = ""; // ready to store
 
-  //HomePageState(this._userSuppliedKey); // constructor
+  String _userSuppliedKey;
+  final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>(); // to show toasts
+  final PlatformStringCryptor _cryptor = new PlatformStringCryptor();
+
+  HomePageState(this._userSuppliedKey); // constructor
 
   @override
   initState() {
     super.initState();
-    _initPlatformState();
+    // load and decrypt {IDs: titles and content previews} to display
     _loadIDsFromMemory();
+    // parse it into _noteTitlesAndIDs for easier access
+    _parseNoteTitlesAndIDs();
+
     debugPrint("this is the key we received:");
     debugPrint(_userSuppliedKey);
-    debugPrint("bfore tryme");
-    tryme();
-    debugPrint("after tryme");
+    debugPrint(_noteTitlesAndIDs.toString());
   }
 
-  _initPlatformState() async { // TODO is this not working or something?
-    final PlatformStringCryptor cryptor = new PlatformStringCryptor();
-    final String _salt = await _storage.read(key: "salt");
-    final String _password = await _storage.read(key: "password"); // TODO: is this a good idea?
-    // TODO: Think about passing the notes themselves, or asking LoginPage to do the decrypting
-
-    final String _generatedKey = await cryptor.generateKeyFromPassword(_password, _salt);
-    debugPrint(_generatedKey);
-  }
-
-  tryme() async {
-    debugPrint("terrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr");
-    writeTitles("title 1\$ title 2\$ title 3");
-    debugPrint("wrote titels");
-    var lol = await readTitles();
-    debugPrint(lol);
-  }
-
-  void _loadIDsFromMemory() async { // TODO fix this!!!!! test this!!!!!
-    String _noteIDsString = await readTitles();
+  _parseNoteTitlesAndIDs(){
     String separator = "\$";
-    debugPrint("about to split diz");
-    debugPrint(_noteIDsString);
-    List<String> _noteIDsList = _noteIDsString.split(separator);
-    setState( () => _noteIDs = new Set.from(_noteIDsList) ?? new Set());
+    var noteTitlesAndIDsSplit = _noteTitlesAndIDsDecrypted.split(separator);
+    // setState( () => _noteIDs = new Set.from(noteTitlesAndIDsSplit) ?? new Set()); // todo, just copied this
+    debugPrint(noteTitlesAndIDsSplit.toString());
+    _noteTitlesAndIDs[4] = ["title 4", "small content 4"]; // TODO put parsed stuff in this variable
+    // TODO come up with great storage format, should also validate titles for $
+    // todo no we should not, we should convert them to base64 just like the key!
+  }
+
+  _saveNoteTitlesAndIds() async {
+    String result = "";
+    String separator = "\$";
+    _noteTitlesAndIDs.forEach((id, lst){
+      result = result + id.toString() + separator + lst.toString();
+    });
+    debugPrint("This is the result of converting the note titles and ids:");
+    debugPrint(result);
+    _noteTitlesAndIDsDecrypted = result;
+    // encrypt
+    _noteTitlesAndIDsEncrypted = await _cryptor.encrypt(_noteTitlesAndIDsDecrypted, _userSuppliedKey);
+    // save in file 'titles_encrypted.txt'
+    final path = (await getApplicationDocumentsDirectory()).path;
+    final file = new File('$path/titles_encrypted.txt');
+    file.writeAsString(_noteTitlesAndIDsEncrypted); // Write the file
+  }
+
+  void _loadIDsFromMemory() async {
+    // read encrypted file with titles and ids
+    try {
+      final path = (await getApplicationDocumentsDirectory()).path;
+      final file = new File('$path/titles_encrypted.txt');
+      String contents = await file.readAsString(); // Read the file
+      debugPrint("string contents:");
+      debugPrint(contents);
+      _noteTitlesAndIDsEncrypted = contents;
+    }
+    catch (e) { // No file yet
+      debugPrint("Reading titles failed. Creating file and returning empty string.");
+      final path = (await getApplicationDocumentsDirectory()).path;
+      final file = new File('$path/titles_encrypted.txt');
+      String emptyStringEncrypted = await _cryptor.encrypt("", _userSuppliedKey); // always encrypt
+      file.writeAsString(emptyStringEncrypted); // Write the file
+      return; // If we encounter an error, abort
+    }
+    // this one goes wrong cuz it is passed unencrypted data
+    _noteTitlesAndIDsDecrypted = await _cryptor.decrypt(_noteTitlesAndIDsEncrypted, _userSuppliedKey);
+    debugPrint("Decryption successful.");
+    debugPrint(_noteTitlesAndIDsDecrypted);
+
+  }
+
+  void _makeNewNote() async {
+    debugPrint("New note!");
+    // get last ID
+    int biggestID = _noteTitlesAndIDs.keys.reduce(max); // if this is too slow we can always save it, too
+    // newID = lastID + 1
+    int newID = biggestID + 1;
+    // update titles (newID: untitled, nocontent at first)
+    _noteTitlesAndIDs[newID] = ["Untitled", ""];
+    _saveNoteTitlesAndIds();
+    // make a new file newID.txt
+    final path = (await getApplicationDocumentsDirectory()).path;
+    final file = new File('$path/$newID.txt');
+    String emptyEncrypted = await _cryptor.encrypt("", _userSuppliedKey);
+    file.writeAsString(emptyEncrypted); // Write the file
+    // go to note editor to edit
+    Navigator.of(context).pushNamed("/noteEditor/${newID.toString()}");
+    // when saved over there, once again update titles, and write both files (check if title changed)
   }
 
   @override
@@ -103,18 +150,6 @@ class HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  void _makeNewNote() async {
-    debugPrint("new note!");
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    int lastID = prefs.getInt("lastID") ?? 0;
-    int newID = lastID + 1;
-    _noteIDs.add(newID.toString());
-    debugPrint(_noteIDs.toString());
-    prefs.setInt("lastID", newID);
-    prefs.setStringList("noteIDs", _noteIDs.toList());
-    Navigator.of(context).pushNamed("/noteEditor/${newID.toString()}");
-  }
   
   Widget _homeScreen() {
     return new ListView(
@@ -124,13 +159,14 @@ class HomePageState extends State<HomePage> {
 
   List<ListTile> _buildListTiles(){
     List<ListTile> result = [];
-    for (String noteID in _noteIDs){
-      result.add(new ListTile(
-        title: new Text(noteID),
-        subtitle: new Text("content here"),
-        onTap: () => Navigator.of(context).pushNamed("/noteEditor/${noteID.toString()}"),
-      ));
-    }
+    _noteTitlesAndIDs.forEach(
+        (noteID, lst) {
+          result.add(new ListTile(
+            title: new Text(lst[0]),
+            subtitle: new Text(lst[1]),
+            onTap: () => Navigator.of(context).pushNamed("/noteEditor/${noteID.toString()}"),
+          ));
+        });
     return result;
   }
 
@@ -141,7 +177,7 @@ class HomePageState extends State<HomePage> {
           new ListTile(
             leading: new Icon(Icons.library_books),
             title: new Text("aj"),
-            onTap: readTitles,
+            onTap: (){}, // nothing
           ),
           new ListTile(
             leading: new Icon(Icons.exit_to_app),
@@ -152,27 +188,5 @@ class HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  void writeTitles(String titles) async {
-    final path = (await getApplicationDocumentsDirectory()).path;
-    final file = new File('$path/note_titles.txt');
-    file.writeAsString('$titles'); // Write the file
-}
-
-  Future<String> readTitles() async {
-    try {
-      final path = (await getApplicationDocumentsDirectory()).path;
-      final file = new File('$path/note_titles.txt');
-      String contents = await file.readAsString(); // Read the file
-      debugPrint("he");
-      debugPrint(contents);
-      return contents;
-    }
-    catch (e) { // No file yet
-      debugPrint("er");
-      return ""; // If we encounter an error, return empty str
-    }
-  }
-
 
 }

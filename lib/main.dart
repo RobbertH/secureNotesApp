@@ -16,13 +16,15 @@ void main() => runApp(new MaterialApp(
       );
     }
 
-    var path = settings.name.split("/"); // indexing starts at 0 but first element is empty
+    List<String> path = settings.name.split("/"); // indexing starts at 0 but first element is empty
+    debugPrint("Routing - The path is:");
+    debugPrint(path.toString());
+
     if (path.length >= 3) { // e.g. [, noteEditor, id]
 
       if (path[1] == "noteEditor") {
         return new CustomRoute(
           builder: (_) => new NoteEditor(id: path[2]),
-          // path[1] is the node's ID
           settings: settings,
           transition: Transition.fade,
         );
@@ -30,16 +32,14 @@ void main() => runApp(new MaterialApp(
 
     }
 
-    if (path.length >= 4){
+    if (path.length >= 3){
 
       if (path[1] == "homePage") {
-        debugPrint("zibi");
-        debugPrint(path[2]);
-        debugPrint(parseUTF(path[2]));
-        debugPrint(path[3]);
+        debugPrint("Going to homePage.");
+        //debugPrint(path[2]);
+        //debugPrint(parseUTF(path[2]));
         return new CustomRoute(
-          builder: (_) => new HomePage(parseUTF(path[2]), parseTitles(path[3])),
-          // TODO: pass decrypted note titles or key
+          builder: (_) => new HomePage(parseUTF(path[2])),
           settings: settings,
           transition: Transition.fade,
         );
@@ -54,14 +54,14 @@ void main() => runApp(new MaterialApp(
   },
 ));
 
-String parseUTF(String txt){ // TODO lol variable names suck balls
-  debugPrint("start parsing utf");
+String parseUTF(String txt){
+  debugPrint("start parsing UTF");
   List<int> result = new List<int>();
   if (txt.length > 2) {
     txt = txt.substring(1, txt.length - 1); // don't need brackets
-    var opi = txt.split(",");
-    for (var el in opi) {
-      result.add(int.parse(el.trim())); // strip spaces
+    List<String> characters = txt.split(",");
+    for (var character in characters) {
+      result.add(int.parse(character.trim())); // trim spaces
     }
     return utf8.decode(result);
   }
@@ -71,19 +71,19 @@ String parseUTF(String txt){ // TODO lol variable names suck balls
   }
 }
 
-List<String> parseTitles(String txt){ // TODO lol variable names suck balls
-  debugPrint("start parsing titles");
-  List<String> result = new List<String>();
-  if (txt.length > 2) {
-    txt = txt.substring(1, txt.length - 1); // don't need brackets
-    var opi = txt.split(",");
-    for (var el in opi) { // TODO list comprehension?
-      result.add(el.trim()); // strip spaces from sides
-    }
-    return result;
-  }
-  else {
-    debugPrint("parsing error");
-    return null;
-  }
-}
+//List<String> parseTitles(String txt){ // TODO lol variable names suck balls
+//  debugPrint("start parsing titles");
+//  List<String> result = new List<String>();
+//  if (txt.length > 2) {
+//    txt = txt.substring(1, txt.length - 1); // don't need brackets
+//    var opi = txt.split(",");
+//    for (var el in opi) { // TODO list comprehension?
+//      result.add(el.trim()); // strip spaces from sides
+//    }
+//    return result;
+//  }
+//  else {
+//    debugPrint("parsing error");
+//    return null;
+//  }
+//}

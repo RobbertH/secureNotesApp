@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter_string_encryption/flutter_string_encryption.dart';
-import 'package:crypt/crypt.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // Store data in secure storage (keyChain or keyStore)
+import 'package:flutter_string_encryption/flutter_string_encryption.dart'; // AES/CBC/PKCS5/Random IVs/HMAC-SHA256 Integrity Check
+import 'package:crypt/crypt.dart'; // One-way string hashing for salted passwords using the Unix crypt format.
 import 'dart:convert';
 
 // TODO: include pictures in the README
@@ -21,12 +21,15 @@ class _LoginPageState extends State<LoginPage> {
 
   String _userSuppliedPassword;
   String _errorMessage = "";
+  String _passwordFieldHintText = "Your password";
 
   Color _keyIconColor = Colors.amber;
 
-  final _secureStorage = new FlutterSecureStorage(); // to securely store the salt
+  // to securely store the salt needed to generate the key that crypt uses
+  // and also the password itself (TODO)
+  final _secureStorage = new FlutterSecureStorage();
 
-  final TextEditingController textEditingController = new TextEditingController();
+  final TextEditingController _textEditingController = new TextEditingController();
 
 //  Set<String> _noteIDs = new Set();
 
@@ -35,7 +38,6 @@ class _LoginPageState extends State<LoginPage> {
     debugPrint("LoginPage");
     super.initState();
     _checkIfFirstTime();
-//    _loadIDsFromMemory(); // TODO remove?
   }
 
   void _checkIfFirstTime() async {
@@ -46,20 +48,16 @@ class _LoginPageState extends State<LoginPage> {
     catch (e) { // don't have a password yet -> new user
       setState(() {
         _errorMessage = "\n Welcome. Please set a new password.";
+        _passwordFieldHintText = "Your new password";
       });
     }
     if (tester == null){ // don't have a password yet -> new user
       setState(() {
         _errorMessage = "\n Welcome. Please set a new password.";
+        _passwordFieldHintText = "Your new password";
       });
     }
   }
-
-//  void _loadIDsFromMemory() async {
-//    SharedPreferences prefs = await SharedPreferences.getInstance();
-//    setState( () => _noteIDs = new Set.from(prefs.getStringList("noteIDs")) ?? new Set());
-//    debugPrint(_noteIDs.toString());
-//  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,9 +74,9 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               new Expanded(child: new Container()),
               new TextFormField(
-                controller: textEditingController,
+                controller: _textEditingController,
                 decoration: new InputDecoration(
-                  labelText: 'Your password',
+                  labelText: _passwordFieldHintText,
                   icon: new Transform(
                     transform: new Matrix4.rotationZ(3.14159265/2),
                     child: new Icon(Icons.vpn_key, color: _keyIconColor,),
@@ -88,18 +86,23 @@ class _LoginPageState extends State<LoginPage> {
                   suffixIcon: new InkWell(
                     onTap: _onOK,
                     child: new Container(
+                      width: 2.0,
+                      height: 2.0,
                       decoration: new BoxDecoration(
                         border: new Border.all(width: 2.0, color: Colors.lightBlue,),
                       ),
-                      child: new Text(" OK ", style: new TextStyle(
-                        color: Colors.lightBlue,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      child: new Center(
+                        child: new Text(" OK ", style: new TextStyle(
+                          color: Colors.lightBlue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        ),
                       ),
                       ),
                     ),
                 ),
-                validator: (value) => value.length == 0 ? 'Please input a password' : null, // TODO: passwordless should be possible. Lay end responsibility at user.
+                validator: (value) => value.length == 0 ? 'Please input a password' : null,
+                // TODO: passwordless should be possible. Lay end responsibility at user.
                 onSaved: (value) => _userSuppliedPassword = value,
                 obscureText: true,
               ),
@@ -113,54 +116,63 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _onOK(){
-    debugPrint("OK");
+    debugPrint("Ok button pushed");
 
     final form = _formKey.currentState;
 
     if (form.validate()) {
-      form.save();
-      textEditingController.clear();
+      form.save(); // Executes onSaved defined earlier (i.e. _userSuppliedPassword is fetched from input field)
+      _textEditingController.clear(); // Wipes password from input field
       _performLogin();
     }
   }
 
   void _performLogin() async {
-    // USER FEEDBACK: WE'RE DOING STUFF FOR YOU
-    debugPrint("lala");
+    debugPrint("_performLogin started");
 
-    setState(() {
+    setState(() { // User feedback: we're doing stuff for you
       _keyIconColor = Colors.amber;
       _errorMessage = "\n Verifying password. Please wait.";
     });
 
-    authenticate();
+    _authenticate();
   }
 
-  void authenticate() async {
+  void _authenticate() async {
     // === AUTHENTICATION FIRST ===
     // If the user can authenticate, the same password will be used
-    // To decrypt the note titles, and eventually the notes themselves
+    // to decrypt the note titles (which reside in a separate file with title + ID),
+    // and eventually the notes themselves (which have a file for themselves,
+    // each containing the ID + title + content).
     // The password will be pushed to the note editor.
 
     String _passwordHash;
 
-    debugPrint("entertainers");
+    debugPrint("Authentication started");
 
+    // First declare inner function to define what happens in catch/null blocks.
+    // This block of code is a bit confusing because it's not chronological, but it is used
+    // later in the code, when we try to fetch the hash and it is not found.
+    // That means there is no password yet. Hence we'll make one.
     void onHashFetchFail() async {
-      // first declare inner function
       setState(() {
         _errorMessage = "\n Securely storing new password. Please wait.";
       });
-      Crypt newHashMachine = new Crypt.sha256(
-          _userSuppliedPassword); // randomly salted (handled by Crypt)
+      Crypt newHashMachine = new Crypt.sha256(_userSuppliedPassword); // randomly salted (handled by Crypt)
       _passwordHash = newHashMachine.toString();
       await _secureStorage.write(
-          key: "passwordHash", value: _passwordHash); // store password hash
+        key: "passwordHash", value: _passwordHash); // store password hash
+        setState(() {
+          _errorMessage = "\n Securely stored new password. Re-enter to log in.";
+        });
     }
-    try { // fetch password hash from secure memory
+
+    // Fetch password hash from secure memory
+    try {
       _passwordHash = await _secureStorage.read(key: "passwordHash");
     }
-    catch (e) { // don't have a password yet -> make one
+    // Don't have a password yet -> make one (as defined in the method above)
+    catch (e) {
       onHashFetchFail();
     }
     if (_passwordHash == null) {
@@ -176,47 +188,53 @@ class _LoginPageState extends State<LoginPage> {
     }
     else { // Correct password
       setState(() {
-        _keyIconColor = Colors.greenAccent;
+        _keyIconColor = Colors.lightGreen;
         _errorMessage = "\n Correct password. Decrypting. Please wait.";
       });
       // === LOGIN SUCCESSFUL -> DECRYPT NOTE TITLES ===
-      decryptNoteTitles();
+      _decryptNoteTitles();
     }
 
-    debugPrint("hurroo");
+    debugPrint("Reached end of _authenticate method.");
   }
 
-  void decryptNoteTitles() async {
+  void _decryptNoteTitles() async {
     final PlatformStringCryptor cryptor = new PlatformStringCryptor();
-    debugPrint("crrct");
+    debugPrint("Reached decryptNoteTitles.");
 
     // _saltForNotes fetching or generating
     String _saltForNotes;
     void onSaltFetchFail() async {
+      debugPrint("Salt fetch fail");
       _saltForNotes = await cryptor.generateSalt();
+      debugPrint("Got new salt! here it is:");
+      debugPrint(_saltForNotes);
       await _secureStorage.write(key: "saltForNotes", value: _saltForNotes);
+      debugPrint("Salt written to secure storage.");
     }
     try { // fetch salt from secure memory
-      debugPrint("here");
+      debugPrint("Trying to fetch salt.");
       _saltForNotes = await _secureStorage.read(key: "saltForNotes");
     }
     catch (e) { // don't have a salt yet -> make one
-      debugPrint("never");
+      debugPrint("Don't have salt yet (error)");
       onSaltFetchFail();
     }
     if (_saltForNotes == null) {
-      debugPrint("here!");
+      debugPrint("Don't have salt yet (null)");
       onSaltFetchFail();
     }
-    debugPrint("nice");
 
-    final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes);
-    debugPrint(_key);
-    debugPrint("nice!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    final String string = "[title 1, title 2, title 3]"; // TODO validate titles (no ",")
-    final String encrypted = await cryptor.encrypt(string, _key);
-    //String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
+    debugPrint("We should have a salt now (new or existing) "
+        "(this message might be printed when it is still generating, because of the async functions)");
+
+    debugPrint("Generating key from user supplied password"); // TODO here we are now
     final String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
+    //final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes);
+    //debugPrint(_key);
+    final String string = "[title 1, title 2, title 3]"; // TODO validate titles (no ",")
+    final String encrypted = await cryptor.encrypt(string, _userSuppliedKey); // TODO fetch titles from file
+    //String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
     String _noteTitlesDecrypted;
     try {
       _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
@@ -225,15 +243,15 @@ class _LoginPageState extends State<LoginPage> {
         _keyIconColor = Colors.red;
         _errorMessage = "\n Wrong password. Please retry.";
       });
-      // TODO think about best way to inform user: snackbar, red error form or status quo (text)
     }
 
+// TODO: pass only key, decrypt when loading the page
     if (_noteTitlesDecrypted != null) {
-      // doesn't matter if hacker sets this to non-null somehow, values aren't decrypted in that case :)
-      debugPrint("woop woop");
-      debugPrint(_key);
+      // Doesn't matter if attacker sets this to non-null somehow, values aren't decrypted in that case.
+      debugPrint("Succesfully decrypted note titles.");
+      debugPrint(_userSuppliedKey);
       debugPrint(_noteTitlesDecrypted);
-      Navigator.of(context).pushNamed('/homePage/${utf8.encode(_key).toString()}/$_noteTitlesDecrypted');
+      Navigator.of(context).pushNamed('/homePage/${utf8.encode(_userSuppliedKey).toString()}');
       // Need slash for routing. That's why we convert to utf8.
       // Can only pass strings, so .toString() yields "[int, int, int,...]"
       // will be parsed when routing

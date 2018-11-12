@@ -6,7 +6,7 @@ dependencies:
     sdk: flutter
   shared_preferences: # for the IDs (might become unnecessary)
   path_provider: "^0.4.0" # to store the notes as files
-  flutter_string_encryption: "^0.0.2" # to encrypt and decrypt the notes
+  flutter_string_encryption: "^0.2.0" # to encrypt and decrypt the notes
   flutter_secure_storage: "^2.0.0" # to store the salt generated with flutter_string_encryption and the hashed passwd
   crypt: "^1.0.5" # to securely store the hashed and salted password
 
