@@ -1,38 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:flutter_string_encryption/flutter_string_encryption.dart';
-import 'dart:async';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // TODO get rid of this
 import 'dart:math';
-
-// TODO: encrypt notes and their titles
-// decrypt all titles (seperate file), to build the listView
-// decrypt note (seperate file per note) only when clicked on the respective listTile => handled in NoteEditor
-
-// TODO: switch from sharedprefs to files (better for exporting & encrypting)
-// TODO: sharedpreferences is super wrong! use files!
-
-// TODO: implement export feature: without encryption (plain) / without salt / with everything (and release salt to user)
-
-// TODO: is it possible to 'ask' the loginpage to decrypt the notes?
-// TODO: otherwise, just pass the key that was generated from the password (via the Constructor) -> seems like a bad idea
-// TODO: I think we might be able to create a separate class that handles decryption and encryption. But would that
-// TODO: make it better? You still pass it the password or key in the constructor :(
-
-// TODO: I don't think any of this matters. The _userSuppliedPassword is a variable in LoginPage, so
-// TODO: if a hacker could intercept a constructor, he could as well intercept the _userSuppliedPassword. Just pass it.
+import 'package:notes/Cryptography.dart' as Cryptography;
 
 class HomePage extends StatefulWidget {
 
-  String _userSuppliedKey;
-
-  HomePage(this._userSuppliedKey); // constructor
+  HomePage(); // constructor
 
   @override
   State<StatefulWidget> createState() {
-    return new HomePageState(_userSuppliedKey);
+    return new HomePageState();
   }
 }
 
@@ -42,20 +20,15 @@ class HomePageState extends State<HomePage> {
   String _noteTitlesAndIDsDecrypted = ""; // as a string
   String _noteTitlesAndIDsEncrypted = ""; // ready to store
 
-  String _userSuppliedKey;
   final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>(); // to show toasts
-  final PlatformStringCryptor _cryptor = new PlatformStringCryptor();
 
-  HomePageState(this._userSuppliedKey); // constructor
+  HomePageState(); // constructor
 
   @override
   initState() {
     super.initState();
     // load, decrypt and parse {IDs: titles and content previews} to display in ListView
     _loadIDsFromMemory();
-
-    debugPrint("this is the key we received:");
-    debugPrint(_userSuppliedKey);
     debugPrint(_noteTitlesAndIDs.toString());
   }
 
@@ -73,13 +46,13 @@ class HomePageState extends State<HomePage> {
       debugPrint("Reading titles failed. Creating file and returning empty string.");
       final path = (await getApplicationDocumentsDirectory()).path;
       final file = new File('$path/titles_encrypted.txt');
-      String emptyStringEncrypted = await _cryptor.encrypt("", _userSuppliedKey); // always encrypt
+      String emptyStringEncrypted = await Cryptography.encrypt(""); // always encrypt
       file.writeAsString(emptyStringEncrypted); // Write the file
       return; // If we encounter an error, abort
     }
 
     // Decrypt the obtained data
-    _noteTitlesAndIDsDecrypted = await _cryptor.decrypt(_noteTitlesAndIDsEncrypted, _userSuppliedKey);
+    _noteTitlesAndIDsDecrypted = await Cryptography.decrypt(_noteTitlesAndIDsEncrypted);
     debugPrint("Decryption successful.");
     debugPrint(_noteTitlesAndIDsDecrypted);
 
@@ -117,7 +90,7 @@ class HomePageState extends State<HomePage> {
     debugPrint(result);
     _noteTitlesAndIDsDecrypted = result;
     // encrypt
-    _noteTitlesAndIDsEncrypted = await _cryptor.encrypt(_noteTitlesAndIDsDecrypted, _userSuppliedKey);
+    _noteTitlesAndIDsEncrypted = await Cryptography.encrypt(_noteTitlesAndIDsDecrypted);
     // save in file 'titles_encrypted.txt'
     final path = (await getApplicationDocumentsDirectory()).path;
     final file = new File('$path/titles_encrypted.txt');
@@ -140,7 +113,7 @@ class HomePageState extends State<HomePage> {
     // make a new file newID.txt
     final path = (await getApplicationDocumentsDirectory()).path;
     final file = new File('$path/$newID.txt');
-    String emptyEncrypted = await _cryptor.encrypt("", _userSuppliedKey);
+    String emptyEncrypted = await Cryptography.encrypt("");
     file.writeAsString(emptyEncrypted); // Write the file
     // go to note editor to edit
     Navigator.of(context).pushNamed("/noteEditor/${newID.toString()}");

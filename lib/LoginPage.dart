@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // Store da
 import 'package:flutter_string_encryption/flutter_string_encryption.dart'; // AES/CBC/PKCS5/Random IVs/HMAC-SHA256 Integrity Check
 import 'package:crypt/crypt.dart'; // One-way string hashing for salted passwords using the Unix crypt format.
 import 'dart:convert';
+import 'package:notes/Cryptography.dart' as Cryptography;
 
 // TODO: include pictures in the README
 // TODO: animated feedback when decrypting (spinning loader or something)
@@ -25,8 +26,9 @@ class _LoginPageState extends State<LoginPage> {
 
   Color _keyIconColor = Colors.amber;
 
-  // to securely store the salt needed to generate the key that crypt uses
-  // and also the password itself (TODO)
+  // secure storage is used to securely store
+  // * the salt needed to generate the key that crypt uses (saltForNotes)
+  // * and also the hash of the password itself (passwordHash)
   final _secureStorage = new FlutterSecureStorage();
 
   final TextEditingController _textEditingController = new TextEditingController();
@@ -191,20 +193,19 @@ class _LoginPageState extends State<LoginPage> {
         _keyIconColor = Colors.lightGreen;
         _errorMessage = "\n Correct password. Decrypting. Please wait.";
       });
-      // === LOGIN SUCCESSFUL -> DECRYPT NOTE TITLES ===
-      _decryptNoteTitles();
+      // === LOGIN SUCCESSFUL -> MAKE KEY TO BE ABLE TO DECRYPT LATER ===
+      _buildKey();
     }
 
     debugPrint("Reached end of _authenticate method.");
   }
 
-  void _decryptNoteTitles() async {
+  void _buildKey() async {
     final PlatformStringCryptor cryptor = new PlatformStringCryptor();
-    debugPrint("Reached decryptNoteTitles.");
 
     // _saltForNotes fetching or generating
     String _saltForNotes;
-    void onSaltFetchFail() async {
+    Future<void> onSaltFetchFail() async {
       debugPrint("Salt fetch fail");
       _saltForNotes = await cryptor.generateSalt();
       debugPrint("Got new salt! here it is:");
@@ -218,47 +219,25 @@ class _LoginPageState extends State<LoginPage> {
     }
     catch (e) { // don't have a salt yet -> make one
       debugPrint("Don't have salt yet (error)");
-      onSaltFetchFail();
+      await onSaltFetchFail();
     }
     if (_saltForNotes == null) {
       debugPrint("Don't have salt yet (null)");
-      onSaltFetchFail();
+      await onSaltFetchFail();
     }
 
     debugPrint("We should have a salt now (new or existing) "
         "(this message might be printed when it is still generating, because of the async functions)");
 
-    debugPrint("Generating key from user supplied password"); // TODO here we are now
+    debugPrint("Generating key from user supplied password");
     final String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
-    //final String _key = await cryptor.generateKeyFromPassword("p", _saltForNotes);
-    //debugPrint(_key);
-    final String string = "[title 1, title 2, title 3]"; // TODO validate titles (no ",")
-    final String encrypted = await cryptor.encrypt(string, _userSuppliedKey); // TODO fetch titles from file
-    //String _userSuppliedKey = await cryptor.generateKeyFromPassword(_userSuppliedPassword, _saltForNotes);
-    String _noteTitlesDecrypted;
-    try {
-      _noteTitlesDecrypted = await cryptor.decrypt(encrypted, _userSuppliedKey);
-    } on MacMismatchException {
-      setState((){
-        _keyIconColor = Colors.red;
-        _errorMessage = "\n Wrong password. Please retry.";
-      });
-    }
-
-// TODO: pass only key, decrypt when loading the page
-    if (_noteTitlesDecrypted != null) {
-      // Doesn't matter if attacker sets this to non-null somehow, values aren't decrypted in that case.
-      debugPrint("Succesfully decrypted note titles.");
-      debugPrint(_userSuppliedKey);
-      debugPrint(_noteTitlesDecrypted);
-      Navigator.of(context).pushNamed('/homePage/${utf8.encode(_userSuppliedKey).toString()}');
-      // Need slash for routing. That's why we convert to utf8.
-      // Can only pass strings, so .toString() yields "[int, int, int,...]"
-      // will be parsed when routing
-      // TODO: decrypted noteTitles follow the same notation "[title, title, title,...]"
-      // TODO: so titles can never contain slashes or commas, otherwise routing breaks
-      setState(() { _errorMessage = "\n ";});
-    }
+    Cryptography.setKey(_userSuppliedKey);
+    debugPrint(_userSuppliedKey);
+    Navigator.of(context).pushNamed('/homePage');
+    setState(() {
+      _errorMessage = "\n ";
+      _passwordFieldHintText = "Your password";
+    });
 
   }
 

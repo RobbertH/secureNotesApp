@@ -24,7 +24,7 @@ void main() => runApp(new MaterialApp(
 
       if (path[1] == "noteEditor") {
         return new CustomRoute(
-          builder: (_) => new NoteEditor(id: path[2]),
+          builder: (_) => new NoteEditor(path[2]),
           settings: settings,
           transition: Transition.fade,
         );
@@ -32,14 +32,12 @@ void main() => runApp(new MaterialApp(
 
     }
 
-    if (path.length >= 3){
+    if (path.length >= 2){
 
       if (path[1] == "homePage") {
         debugPrint("Going to homePage.");
-        //debugPrint(path[2]);
-        //debugPrint(parseUTF(path[2]));
         return new CustomRoute(
-          builder: (_) => new HomePage(parseUTF(path[2])),
+          builder: (_) => new HomePage(),
           settings: settings,
           transition: Transition.fade,
         );
@@ -70,20 +68,3 @@ String parseUTF(String txt){
     return null;
   }
 }
-
-//List<String> parseTitles(String txt){ // TODO lol variable names suck balls
-//  debugPrint("start parsing titles");
-//  List<String> result = new List<String>();
-//  if (txt.length > 2) {
-//    txt = txt.substring(1, txt.length - 1); // don't need brackets
-//    var opi = txt.split(",");
-//    for (var el in opi) { // TODO list comprehension?
-//      result.add(el.trim()); // strip spaces from sides
-//    }
-//    return result;
-//  }
-//  else {
-//    debugPrint("parsing error");
-//    return null;
-//  }
-//}

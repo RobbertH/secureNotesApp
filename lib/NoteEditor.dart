@@ -2,30 +2,28 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-
-// TODO: make a separate file for a class Note, with ID, encryptedTitle, encryptedContent
-// TODO: and methods to decrypt them using a supplied password
+import 'package:notes/Cryptography.dart' as Cryptography;
 
 class NoteEditor extends StatefulWidget {
-  final String id;
+  final String _id;
 
-  NoteEditor({this.id});
+  NoteEditor(this._id);
 
   @override
   State<StatefulWidget> createState() {
-    return new NoteEditorState(id: id);
+    return new NoteEditorState(_id);
   }
 
 }
 
 class NoteEditorState extends State<NoteEditor> {
 
-  NoteEditorState({this.id});
+  NoteEditorState(this._id);
 
   final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>();
   final FocusNode _textFieldFocusNode = new FocusNode();
 
-  final String id;
+  final String _id;
   static String _note;
   bool _editorMode = false;
 
@@ -38,7 +36,7 @@ class NoteEditorState extends State<NoteEditor> {
   }
 
   void _loadNoteFromMemory() async {
-    String dummy = await readNote(id); // dummy needed to await
+    String dummy = await readNote(_id); // dummy needed to await
     setState( () => _note = dummy);
     _textController.text = _note;
   }
@@ -50,7 +48,7 @@ class NoteEditorState extends State<NoteEditor> {
         key: _scaffoldState,
         appBar: new AppBar(
           leading: new IconButton(icon: new Icon(Icons.arrow_back), onPressed: Navigator.of(context).pop),
-          title: new Text(id),
+          title: new Text(_id),
         ),
         body: _buildBody(),
         floatingActionButton: 
@@ -95,7 +93,7 @@ class NoteEditorState extends State<NoteEditor> {
   }
 
   void _writeNoteToMemory(String value) async {
-    bool succeeded = await writeNote(id, value);
+    bool succeeded = await writeNote(_id, value);
     if (succeeded) {
       debugPrint("written!");
     }
@@ -106,14 +104,16 @@ class NoteEditorState extends State<NoteEditor> {
   Future<bool> writeNote(String noteID, String noteContent) async {
     final path = (await getApplicationDocumentsDirectory()).path;
     final file = new File('$path/${noteID}.txt');
+    String encryptedContent = await Cryptography.encrypt("$noteContent");
     try {
-      file.writeAsString('$noteContent'); // Write the file
+      file.writeAsString('$encryptedContent'); // Write the file
       return true;
     }
     catch (e) {
-      debugPrint("damn :(");
+      debugPrint("Writing note to file failed.");
       return false;
     }
+
   }
 
   Future<String> readNote(String noteID) async {
@@ -121,15 +121,14 @@ class NoteEditorState extends State<NoteEditor> {
       final path = (await getApplicationDocumentsDirectory()).path;
       final file = new File('$path/${noteID}.txt');
       String contents = await file.readAsString(); // Read the file
-      debugPrint("he");
       debugPrint(contents);
-      return contents;
+      return Cryptography.decrypt(contents);
     }
     catch (e) { // No file yet
-      //writeNote(noteTitle, "");
-      debugPrint("er");
+      debugPrint("Failed to open file from editor.");
       return ""; // If we encounter an error, return empty str
     }
+
   }
 
 
