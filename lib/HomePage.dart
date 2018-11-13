@@ -51,45 +51,16 @@ class HomePageState extends State<HomePage> {
   @override
   initState() {
     super.initState();
-    // load and decrypt {IDs: titles and content previews} to display
+    // load, decrypt and parse {IDs: titles and content previews} to display in ListView
     _loadIDsFromMemory();
-    // parse it into _noteTitlesAndIDs for easier access
-    _parseNoteTitlesAndIDs();
 
     debugPrint("this is the key we received:");
     debugPrint(_userSuppliedKey);
     debugPrint(_noteTitlesAndIDs.toString());
   }
 
-  _parseNoteTitlesAndIDs(){
-    String separator = "\$";
-    var noteTitlesAndIDsSplit = _noteTitlesAndIDsDecrypted.split(separator);
-    // setState( () => _noteIDs = new Set.from(noteTitlesAndIDsSplit) ?? new Set()); // todo, just copied this
-    debugPrint(noteTitlesAndIDsSplit.toString());
-    _noteTitlesAndIDs[4] = ["title 4", "small content 4"]; // TODO put parsed stuff in this variable
-    // TODO come up with great storage format, should also validate titles for $
-    // todo no we should not, we should convert them to base64 just like the key!
-  }
-
-  _saveNoteTitlesAndIds() async {
-    String result = "";
-    String separator = "\$";
-    _noteTitlesAndIDs.forEach((id, lst){
-      result = result + id.toString() + separator + lst.toString();
-    });
-    debugPrint("This is the result of converting the note titles and ids:");
-    debugPrint(result);
-    _noteTitlesAndIDsDecrypted = result;
-    // encrypt
-    _noteTitlesAndIDsEncrypted = await _cryptor.encrypt(_noteTitlesAndIDsDecrypted, _userSuppliedKey);
-    // save in file 'titles_encrypted.txt'
-    final path = (await getApplicationDocumentsDirectory()).path;
-    final file = new File('$path/titles_encrypted.txt');
-    file.writeAsString(_noteTitlesAndIDsEncrypted); // Write the file
-  }
-
   void _loadIDsFromMemory() async {
-    // read encrypted file with titles and ids
+    // Read encrypted file with titles and ids
     try {
       final path = (await getApplicationDocumentsDirectory()).path;
       final file = new File('$path/titles_encrypted.txt');
@@ -106,21 +77,65 @@ class HomePageState extends State<HomePage> {
       file.writeAsString(emptyStringEncrypted); // Write the file
       return; // If we encounter an error, abort
     }
-    // this one goes wrong cuz it is passed unencrypted data
+
+    // Decrypt the obtained data
     _noteTitlesAndIDsDecrypted = await _cryptor.decrypt(_noteTitlesAndIDsEncrypted, _userSuppliedKey);
     debugPrint("Decryption successful.");
     debugPrint(_noteTitlesAndIDsDecrypted);
 
+    // Parse the decrypted data
+    String separator = "\$";
+    if (_noteTitlesAndIDsDecrypted.contains(separator)) { // not empty
+      List<String> noteTitlesAndIDsSplit = _noteTitlesAndIDsDecrypted.split(separator);
+      debugPrint("Parsing note titles:");
+      debugPrint(noteTitlesAndIDsSplit.toString());
+      noteTitlesAndIDsSplit.removeLast(); // after last comma there is an empty element. We don't want to parse that.
+      noteTitlesAndIDsSplit
+          .forEach( // TODO this is awful, convert to base64 and use multiple separators (eg $ and :)
+              (str) {
+            debugPrint(str);
+            List<String> tiny = str.split(','); // TODO variable name
+            int id = int.parse(tiny[0]); // save id
+            tiny.removeAt(0); // drop id
+            setState(() {
+              _noteTitlesAndIDs[id] = tiny;
+            });
+          }
+      );
+    }
+    // TODO come up with great storage format, should also validate titles for $
+    // todo no we should not, we should convert them to base64 just like the key!
+  }
+
+  _saveNoteTitlesAndIds() async {
+    String result = "";
+    String separator = "\$";
+    _noteTitlesAndIDs.forEach((id, lst){
+      result = result + id.toString() + ',' + lst.first + ',' + lst.last + separator;
+    });
+    debugPrint("This is the result of converting the note titles and ids:");
+    debugPrint(result);
+    _noteTitlesAndIDsDecrypted = result;
+    // encrypt
+    _noteTitlesAndIDsEncrypted = await _cryptor.encrypt(_noteTitlesAndIDsDecrypted, _userSuppliedKey);
+    // save in file 'titles_encrypted.txt'
+    final path = (await getApplicationDocumentsDirectory()).path;
+    final file = new File('$path/titles_encrypted.txt');
+    file.writeAsString(_noteTitlesAndIDsEncrypted); // Write the file
+    debugPrint("Note titles and IDs updated.");
   }
 
   void _makeNewNote() async {
     debugPrint("New note!");
     // get last ID
-    int biggestID = _noteTitlesAndIDs.keys.reduce(max); // if this is too slow we can always save it, too
+    int biggestID = 0;
+    if (_noteTitlesAndIDs.isNotEmpty) {
+      biggestID = _noteTitlesAndIDs.keys.reduce(max); // if this is too slow we can always save it, too
+    }
     // newID = lastID + 1
     int newID = biggestID + 1;
     // update titles (newID: untitled, nocontent at first)
-    _noteTitlesAndIDs[newID] = ["Untitled", ""];
+    _noteTitlesAndIDs[newID] = ["Untitled", "id: $newID"];
     _saveNoteTitlesAndIds();
     // make a new file newID.txt
     final path = (await getApplicationDocumentsDirectory()).path;
