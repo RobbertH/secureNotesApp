@@ -22,6 +22,11 @@ Future work includes:
 * Whether a SHA256 salted password should be saved. We can also try to decrypt a note and upon failing, conclude that the password is wrong.
 * Whether we want to give the user the option to choose their password as the empty string, or set a minimum password length.
 
+## Screenshots
+![HomePage](https://raw.githubusercontent.com/RobbertH/secureNotesApp/master/screenshots/HomePage.png)
+![LoginPage](https://raw.githubusercontent.com/RobbertH/secureNotesApp/master/screenshots/LoginPage.png)
+![NoteEditor](https://raw.githubusercontent.com/RobbertH/secureNotesApp/master/screenshots/NoteEditor.png)
+
 ## Download
 As this project is still in early development, no executable is provided. An executable can be obtained by cloning this repo and building from source.
 
