@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'notes.dart' as notes;
+import 'notesMap.dart' as notesMap;
 
 class HomePage extends StatefulWidget {
 
@@ -20,7 +20,7 @@ class HomePageState extends State<HomePage> {
 
   void _onFAB() async {
     // Ask notes module to make a new note for us and retrieve its ID
-    int newID = await notes.makeNewNote();
+    int newID = await notesMap.makeNewNote();
     // Go to note editor to edit
     Navigator.of(context).pushNamed("/noteEditor/${newID.toString()}");
   }
@@ -28,7 +28,7 @@ class HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     FutureBuilder futureBuilder = new FutureBuilder(
-        future: notes.getNotesMap(),
+        future: notesMap.getNotesMap(),
         builder: (context, snapshot) {
           switch (snapshot.connectionState) {
             case ConnectionState.none:

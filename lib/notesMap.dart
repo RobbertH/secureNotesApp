@@ -5,11 +5,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:notes/Cryptography.dart' as Cryptography;
 import 'dart:convert';
 
-// TODO: make fields private and make methods for everything
-// e.g. noteTitlesAndIDs.add(id, title, contentPreview)
-// e.g. getNoteTitlesAndIDs()
-// TODO: find a better name
-// e.g. notes.getNotes() instead of notes.getNoteTitlesAndIDs()
+// notesMap handles everything that has to do with the file that saves
+// the Map that contains IDs, titles and contentPreview.
 
 // Note titles and IDs in three formats
 Map<int, List<String>> _notesMap = new Map<int, List<String>>(); // e.g. {5: ["note title 1", "content preview"]}
@@ -22,8 +19,7 @@ const String _contentSeparator = ":"; // content separator within dictionary ite
 
 // Access to private fields
 
-// getNotesMap():
-// load, decrypt and parse {IDs: titles and content previews}
+// getNotesMap: load, decrypt and parse {IDs: titles and content previews}
 Future<Map<int, List<String>>> getNotesMap() async {
   // Read encrypted file with titles and ids
   try {
@@ -71,7 +67,42 @@ Future<Map<int, List<String>>> getNotesMap() async {
   return _notesMap;
 }
 
-void saveNotes() async {
+Future<int> makeNewNote() async {
+  debugPrint("New note!");
+  // get last ID
+  int biggestID = 0;
+  if (_notesMap.isNotEmpty) {
+    biggestID = _notesMap.keys.reduce(max); // if this is too slow we can always save it, too
+  }
+  // newID = lastID + 1
+  int newID = biggestID + 1;
+  // update titles (newID: untitled, nocontent at first)
+  _notesMap[newID] = ["Untitled", "id: $newID"];
+  _saveNotes();
+  // make a new file newID.txt
+  final path = (await getApplicationDocumentsDirectory()).path;
+  final file = new File('$path/$newID.txt');
+  String emptyEncrypted = await Cryptography.encrypt("");
+  file.writeAsString(emptyEncrypted); // Write the file
+  return newID;
+}
+
+void updateNote(int id, String title, String contentPreview){
+  _notesMap[id] = [title, contentPreview];
+  _saveNotes();
+}
+
+String getNoteTitle(int id){
+  try {
+    return _notesMap[id].first;
+  }
+  catch (e) {
+    debugPrint(e.toString());
+    return "Untitled";
+  }
+}
+
+void _saveNotes() async {
   String result = "";
   _notesMap.forEach((id, lst){
     // id is not encoded as a base64 string, because it's an int => safe to parse later
@@ -96,24 +127,4 @@ void saveNotes() async {
   final file = new File('$path/titles_encrypted.txt');
   file.writeAsString(_noteTitlesAndIDsEncrypted); // Write the file
   debugPrint("Note titles and IDs updated.");
-}
-
-Future<int> makeNewNote() async {
-  debugPrint("New note!");
-  // get last ID
-  int biggestID = 0;
-  if (_notesMap.isNotEmpty) {
-    biggestID = _notesMap.keys.reduce(max); // if this is too slow we can always save it, too
-  }
-  // newID = lastID + 1
-  int newID = biggestID + 1;
-  // update titles (newID: untitled, nocontent at first)
-  _notesMap[newID] = ["Untitled", "id: $newID"];
-  saveNotes();
-  // make a new file newID.txt
-  final path = (await getApplicationDocumentsDirectory()).path;
-  final file = new File('$path/$newID.txt');
-  String emptyEncrypted = await Cryptography.encrypt("");
-  file.writeAsString(emptyEncrypted); // Write the file
-  return newID;
 }

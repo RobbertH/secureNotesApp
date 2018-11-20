@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:notes/Cryptography.dart' as Cryptography;
+import 'package:notes/notesMap.dart' as notesMap;
 
 // TODO: the note editor needs access to the encrypted_titles.txt file to
 // fetch the title and update it and update the small content preview text
@@ -27,6 +28,7 @@ class NoteEditorState extends State<NoteEditor> {
 
   final GlobalKey<ScaffoldState> _scaffoldState = new GlobalKey<ScaffoldState>();
   final FocusNode _textFieldFocusNode = new FocusNode();
+  final FocusNode _titleFieldFocusNode = new FocusNode();
 
   final String _id;
   static String _note;
@@ -40,12 +42,18 @@ class NoteEditorState extends State<NoteEditor> {
   void initState() {
     super.initState();
     _loadNoteFromMemory();
+    _loadTitleFromMemory();
   }
 
   void _loadNoteFromMemory() async {
     String dummy = await readNote(_id); // dummy needed to await
     setState( () => _note = dummy);
     _noteTextController.text = _note;
+  }
+
+  void _loadTitleFromMemory() async {
+    String dummy = await notesMap.getNoteTitle(int.parse(_id)); // dummy needed to await
+    setState( () => _noteTitle = dummy);
   }
 
   @override
@@ -68,14 +76,28 @@ class NoteEditorState extends State<NoteEditor> {
   }
 
   Widget _titleBar(){
-    return new InkWell(
-      child: new Text(_noteTitle),
-      onTap: _updateNoteTitle,
-    );
+    return new Row(children: <Widget>[
+      new InkWell(
+        child: new Text(_noteTitle),
+        onTap: _updateNoteTitle,
+      ),
+      new IconButton(icon: new Icon(Icons.edit), onPressed: _updateNoteTitle)
+    ],) ;
   }
 
-
   Future<void> _updateNoteTitle() async {
+    if (_noteTitle == "Untitled") {
+      _titleTextController.clear(); // Never display 'Untitled' in the Title TextField
+    }
+    else {
+      _titleTextController.text = _noteTitle;
+    }
+    try {
+      FocusScope.of(context).requestFocus(_titleFieldFocusNode); // focus on title TextField
+    }
+    catch (e) {
+      debugPrint(e.toString());
+    }
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -83,14 +105,16 @@ class NoteEditorState extends State<NoteEditor> {
           title: Text('Adjust title'),
           content: SingleChildScrollView(
             child: TextField(
-              onChanged: (newTitle){_noteTitle = newTitle;},
               controller: _titleTextController,
+              focusNode: _titleFieldFocusNode,
             ),
           ),
           actions: <Widget>[
             FlatButton(
               child: Text('OK'),
               onPressed: () {
+                _noteTitle = _titleTextController.text;
+                notesMap.updateNote(int.parse(_id), _noteTitle, _getContentPreview(_note));
                 Navigator.of(context).pop();
               },
             ),
@@ -100,17 +124,27 @@ class NoteEditorState extends State<NoteEditor> {
     );
   }
 
+  _getContentPreview(String note){
+    List<String> noteLst = note.split("\n");
+    note = noteLst.first;
+    if (note.length >= 30){
+      return note.substring(0, 30) + "...";
+    }
+    else {
+      return note;
+    }
+  }
 
   Widget _buildBody() {
     return new TextField(
       focusNode: _textFieldFocusNode,
       decoration: new InputDecoration(
         filled: true,
-        fillColor: Colors.yellow,
+        fillColor: Colors.white12,
         hintText: "Start your new note here",
         enabled: false,
       ),
-      maxLines: 1000, // TODO: find better solution for this :p
+      maxLines: 10000, // TODO: find better solution for this :p
       onChanged: (txt){ _note = txt;},
       controller: _noteTextController,
     );
@@ -126,6 +160,7 @@ class NoteEditorState extends State<NoteEditor> {
       setState(() => _editorMode = false); // so we're switching out of it
       _textFieldFocusNode.unfocus();
       _writeNoteToMemory(_note);
+      notesMap.updateNote(int.parse(_id), _noteTitle, _getContentPreview(_note)); // also update content preview
     }
 
     _noteTextController.selection = new TextSelection.fromPosition(
