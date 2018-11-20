@@ -13,7 +13,14 @@ This app aims to be a very simple alternative to the existing notes applications
 ## Status
 All basic functionality is implemented: authentication works and all notes and note titles are encrypted and can be modified in a simple editor.
 
-Future work includes the ability to export the notes, or even sync them to e.g. Google Drive. 
+Future work includes:
+* The ability to export the notes, or even sync them to e.g. Google Drive or dropbox. 
+* A dark theme
+* A better note editor
+
+## Open Questions
+* Whether a SHA256 salted password should be saved. We can also try to decrypt a note and upon failing, conclude that the password is wrong.
+* Whether we want to give the user the option to choose their password as the empty string, or set a minimum password length.
 
 ## Download
 As this project is still in early development, no executable is provided. An executable can be obtained by cloning this repo and building from source.

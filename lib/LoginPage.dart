@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // Store data in secure storage (keyChain or keyStore)
 import 'package:flutter_string_encryption/flutter_string_encryption.dart'; // AES/CBC/PKCS5/Random IVs/HMAC-SHA256 Integrity Check
 import 'package:crypt/crypt.dart'; // One-way string hashing for salted passwords using the Unix crypt format.
-import 'dart:convert';
 import 'package:notes/Cryptography.dart' as Cryptography;
 
 // TODO: include pictures in the README

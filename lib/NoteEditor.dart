@@ -5,11 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:notes/Cryptography.dart' as Cryptography;
 import 'package:notes/notesMap.dart' as notesMap;
 
-// TODO: the note editor needs access to the encrypted_titles.txt file to
-// fetch the title and update it and update the small content preview text
-// ==> move the _noteTitlesAndIDs variable, its en/decrypted string complements
-// and its updates methods to a separate file
-
 class NoteEditor extends StatefulWidget {
   final String _id;
 
