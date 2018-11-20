@@ -4,7 +4,6 @@ import 'package:flutter_string_encryption/flutter_string_encryption.dart'; // AE
 import 'package:crypt/crypt.dart'; // One-way string hashing for salted passwords using the Unix crypt format.
 import 'package:notes/Cryptography.dart' as Cryptography;
 
-// TODO: include pictures in the README
 // TODO: animated feedback when decrypting (spinning loader or something)
 
 class LoginPage extends StatefulWidget {
